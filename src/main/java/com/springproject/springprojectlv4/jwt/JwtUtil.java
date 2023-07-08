@@ -36,6 +36,7 @@ public class JwtUtil {
     }
 
     /* 2. JWT 토큰 생성 */
+        // 인증된 토큰을 기반으로 JWT 토큰을 발급
     public static String createToken(String username, UserRoleEnum role) {
         Date date = new Date();
 
@@ -60,7 +61,7 @@ public class JwtUtil {
     }
 
     /* 4. JWT 토큰 검증 */
-    // 토큰의 만료, 위/변조 를 검증
+        // 토큰의 만료, 위/변조 를 검증
     public boolean validateToken(String token) {
         try {
             Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);

@@ -2,13 +2,18 @@ package com.springproject.springprojectlv4.service;
 
 import com.springproject.springprojectlv4.dto.LoginRequestDto;
 import com.springproject.springprojectlv4.dto.SignupRequestDto;
+import com.springproject.springprojectlv4.entity.Board;
+import com.springproject.springprojectlv4.entity.Comment;
 import com.springproject.springprojectlv4.entity.User;
 import com.springproject.springprojectlv4.entity.UserRoleEnum;
 import com.springproject.springprojectlv4.exception.CustomException;
 import com.springproject.springprojectlv4.jwt.JwtUtil;
+import com.springproject.springprojectlv4.repository.BoardRepository;
+import com.springproject.springprojectlv4.repository.CommentRepository;
 import com.springproject.springprojectlv4.repository.UserRepository;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
@@ -21,13 +26,15 @@ import static com.springproject.springprojectlv4.exception.ErrorCode.*;
 @RequiredArgsConstructor
 public class UserService {
     private final UserRepository userRepository;
-
-    private final String ADMIN_TOKEN = "AAABnvxRVklrnYxKZ0aHgTBcXukeZygoC";     // ADMIN_TOKEN
+    private final PasswordEncoder passwordEncoder;
+    private final BoardRepository boardRepository;
+    private final CommentRepository commentRepository;
+    private final String ADMIN_TOKEN = "AAABnvxRVklrnYxKZ0aHgTBcXukeZygoC";
 
     // 회원 가입
     public void signup(SignupRequestDto requestDto) {
         String username = requestDto.getUsername();
-        String password = requestDto.getPassword();
+        String password = passwordEncoder.encode(requestDto.getPassword());
 
         // 회원 중복 확인
         Optional<User> checkUsername = userRepository.findByUsername(username);
@@ -41,6 +48,7 @@ public class UserService {
             if (!ADMIN_TOKEN.equals(requestDto.getAdminToken())) {
                 throw new CustomException(NOT_MATCH_ADMIN_TOKEN);
             }
+
             role = UserRoleEnum.ADMIN;
         }
 
@@ -59,11 +67,49 @@ public class UserService {
         );
 
         // 비밀번호 일치 여부 확인
-        if (!user.getPassword().equals(password)) {
+        if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new CustomException(NOT_MATCH_INFORMATION);
         }
 
         // Header 에 key 값과 Token 담기
         response.addHeader(JwtUtil.AUTHORIZATION_HEADER, JwtUtil.createToken(user.getUsername(), user.getRole()));
+    }
+
+    // 사용자의 권한 확인 - 게시글
+    Board findByBoardIdAndUser(Long boardId, User user) {
+        Board board;
+
+        // ADMIN
+        if (user.getRole().equals(UserRoleEnum.ADMIN)) {
+            board = boardRepository.findById(boardId).orElseThrow(
+                    () -> new CustomException(NOT_FOUND_BOARD)
+            );
+        // USER
+        } else {
+            board = boardRepository.findByIdAndUserId(boardId, user.getId()).orElseThrow (
+                    () -> new CustomException(NOT_FOUND_BOARD_OR_AUTHORIZATION)
+            );
+        }
+
+        return board;
+    }
+
+    // 사용자의 권한 확인 - 댓글
+    Comment findByCmtIdAndUser(Long cmtId, User user) {
+        Comment comment;
+
+        // ADMIN
+        if (user.getRole().equals(UserRoleEnum.ADMIN)) {
+            comment = commentRepository.findById(cmtId).orElseThrow(
+                    () -> new CustomException(NOT_FOUND_COMMENT)
+            );
+        // USER
+        } else {
+            comment = commentRepository.findByIdAndUserId(cmtId, user.getId()).orElseThrow (
+                    () -> new CustomException(NOT_FOUND_COMMENT_OR_AUTHORIZATION)
+            );
+        }
+
+        return comment;
     }
 }
